@@ -1,106 +1,167 @@
-module Timing_control
+module Timing_control #(parameter CMD_IDLE = 4'b0000, CMD_START = 4'b0001, CMD_DATA_TRANSFER	= 4'b0010, CMD_RESTART = 4'b0011, CMD_STOP = 4'b0100)
 (
 	input			i_clk,
 	input			i_rst,
 	input			i_mode,
-	input	[3:0]	i_cmd_state,
+	input	[4:0]	i_cmd_state,
 		
 	output		o_clk_10MHz,
-	output		o_clk_mode,
-	output		o_T_HD_STA_done,
-	output		o_T_HD_DAT_done,
-	output		o_T_VD_DAT_done
+	inout			o_SCL,
+	output		o_t_HD_STA_done,
+	output		o_t_HD_DAT_done,
+	output		o_t_VD_DAT_done
 );
-	parameter 	CMD_IDLE 					= 	4'b0000;
-	parameter 	CMD_START 					= 	4'b0001;
-	parameter 	CMD_RESTART 				= 	4'b0010;
-	parameter 	CMD_STOP 					= 	4'b0011;
 
-	parameter		STANDART_MODE					=	1'b0;
-	parameter		FAST_MODE						=	1'b1;
-
+	
+	////////////////////////////////////////////////////
+	//Find out which mode selected//////////////////////
+	localparam		STANDART_MODE				=	1'b0;
+	localparam 		FAST_MODE					=	1'b1;
 	reg				r_mode						=	0;
+	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////	
+
+			
+	////////////////////////////////////////////////////
+	//for SCL signal genereate//////////////////////////		
+	reg	[6:0]		r_counter_for_SCL			=	0;
+	reg				r_counter_for_SCL_en		= 	1'b1;
+	reg				r_SCL							=	1'b0;
+	wire	[6:0]		w_t_LOW_count_goal		=	(r_mode == 0) ? 7'd24 : 7'd7;	//standart or fast mode (5000 or 1400 ns)
+	wire 				w_t_LOW_done				= 	(r_counter_for_SCL == w_t_LOW_count_goal);	
+	wire	[6:0]		w_t_HIGH_count_goal		=	(r_mode == 0) ? (7'd25 + w_t_LOW_count_goal) : (7'd6 + w_t_LOW_count_goal);	//standart or fast mode (5000 or 1200 ns)
+	wire 				w_t_HIGH_done				= 	(r_counter_for_SCL == w_t_HIGH_count_goal);
+	assign			o_SCL							=	r_SCL;
+	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////	
 	
+	
+	////////////////////////////////////////////////////
+	//Timer for t_HD_STA timing/////////////////////////	
 	reg	[5:0]		r_t_HD_STA_counter		=	0;
-	wire	[5:0]		w_t_HD_count_goal			=	(r_mode == 0) ? 41 : 7;
+	wire	[5:0]		w_t_HD_count_goal			=	(r_mode == 0) ? 7'd21 : 7'd4;	//standart or fast mode (4200 or 800 ns)
 	wire 				w_t_HD_STA_done			= 	(r_t_HD_STA_counter == w_t_HD_count_goal);
-	assign 			o_T_HD_STA_done			=	w_t_HD_STA_done;
+	assign 			o_t_HD_STA_done			=	w_t_HD_STA_done;
+	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////	
+
 	
+	////////////////////////////////////////////////////
+	//Timer for t_HD_DAT timing/////////////////////////		
+	wire	[5:0]		w_t_HD_DAT_count_goal	=	(r_mode == 0) ? 7'd5 : 7'd2;	//standart or fast mode (1000 or 400 ns)
+	wire 				w_t_HD_DAT_done			= 	(r_counter_for_SCL == w_t_HD_DAT_count_goal);
+	assign 			o_t_HD_DAT_done			=	w_t_HD_DAT_done;
+	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////	
+
 	
-	reg	[5:0]		r_t_LOW_counter			=	0;
-	wire	[5:0]		w_t_LOW_count_goal		=	(r_mode == 0) ? 50 : 14;
-	wire 				w_t_LOW_done				= 	(r_t_LOW_counter == w_t_LOW_count_goal);
-		
-	reg	[5:0]		r_t_HIGH_counter			=	0;
-	wire	[5:0]		w_t_HIGH_count_goal		=	(r_mode == 0) ? 50 : 11;
-	wire 				w_t_HIGH_done				= 	(r_t_HIGH_counter == w_t_HIGH_count_goal);
-		
-	reg	[5:0]		r_t_HD_DAT_counter		=	0;
-	wire	[5:0]		w_t_HD_DAT_count_goal	=	(r_mode == 0) ? 51 : 2;
-	wire 				w_t_HD_DAT_done			= 	(r_t_HD_DAT_counter == w_t_HD_DAT_count_goal);
-	assign 			o_T_HD_DAT_done			=	w_t_HD_DAT_done;
-	
+	////////////////////////////////////////////////////
+	//Timer for t_VD_DAT timing/////////////////////////		
 	reg	[5:0]		r_t_VD_DAT_counter		=	0;
-	wire	[5:0]		w_t_VD_DAT_count_goal	=	(r_mode == 0) ? 34 : 9;
+	wire	[5:0]		w_t_VD_DAT_count_goal	=	(r_mode == 0) ? 7'd17 : 7'd4;	//standart or fast mode (3400 or 800 ns)
 	wire 				w_t_VD_DAT_done			= 	(r_t_VD_DAT_counter == w_t_VD_DAT_count_goal);
-	assign 			o_T_VD_DAT_done			=	w_t_VD_DAT_done;
+	assign 			o_t_VD_DAT_done			=	w_t_VD_DAT_done;
+	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////	
+
 	
-	reg 	[2:0]		r_counter_10MHz			=	0;
+	////////////////////////////////////////////////////
+	//10MHz clk/////////////////////////////////////////	
+	reg 	[2:0]		r_counter_for_10MHz		=	0;
 	reg				r_10MHz						=	0;
 	assign			o_clk_10MHz					=	r_10MHz;
+	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////	
+
 	
-	reg	[6:0]		r_counter_mode				=	0;
-	reg				r_clk_mode					=	0;
-	assign			o_clk_mode					=	r_clk_mode;
-	
+	////////////////////////////////////////////////////
+	//Check out which mode selected/////////////////////		
 	always @(*) begin
 		if(i_mode)
 			r_mode 		<= STANDART_MODE;
 		else
 			r_mode		<= FAST_MODE;
 	end
+	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////		
+
 	
-	
+	////////////////////////////////////////////////////
+	//Always genereate 10MHz(main clock for FSM in top module)
 	always @(posedge i_clk) begin
-		if(r_counter_10MHz == 4) begin
-			r_10MHz				<= 	r_10MHz ^ 1'b1;
-			r_counter_10MHz	<=		0;
+		if(r_counter_for_10MHz == 5'd4) begin
+			r_10MHz					<= 	r_10MHz ^ 1'b1;
+			r_counter_for_10MHz	<=		0;
 		end
 		else
-			r_counter_10MHz 	<=		r_counter_10MHz + 1'b1;
+			r_counter_for_10MHz 	<=		r_counter_for_10MHz + 1'b1;
 	end
-
-	always @(posedge o_clk_10MHz or posedge i_rst) begin
-		if(i_rst) begin
-			r_counter_mode <=	0;
-			r_clk_mode		<=	0;
-		end
-		else begin
-			r_counter_mode <= r_counter_mode + 1'b1;
-			
-			if(r_counter_mode == 0)
-				r_clk_mode		<=	1'b0;
-			else if(w_t_LOW_done)
-				r_clk_mode		<=	1'b1;
-			else if(w_t_HIGH_done) begin
-				r_clk_mode		<=	1'b0;	
-				r_counter_mode <= 0;
-			end
-		end
-	end
+	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////		
 	
+	
+	////////////////////////////////////////////////////
+	///generate SCL when it needed//////////////////////
+	always @(posedge o_clk_10MHz or posedge i_rst or posedge r_counter_for_SCL_en) begin
+		if(r_counter_for_SCL_en || i_rst) begin
+			r_counter_for_SCL 	<=	0;
+			r_SCL						<=	1'bz;
+		end
+		else begin			
+			if(r_counter_for_SCL == 0) begin
+				r_SCL					<=	1'b0;
+				r_counter_for_SCL 	<= r_counter_for_SCL + 1'b1;
+			end
+			else if(w_t_LOW_done) begin
+				r_SCL					<=	1'bz;
+				r_counter_for_SCL 	<= r_counter_for_SCL + 1'b1;
+			end
+			else if(w_t_HIGH_done) begin
+				r_SCL					<=	1'b0;	
+				r_counter_for_SCL <= 0;
+			end
+			else 
+				r_counter_for_SCL 	<= r_counter_for_SCL + 1'b1;
+		end
+	end
+	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////		
+
+	////////////////////////////////////////////////////
+	//FSM for timing control////////////////////////////	
 	always @(posedge o_clk_10MHz or posedge i_rst) begin
 		if(i_rst) begin
 		
 		end
 		else begin
-			case(i_cmd_state) begin
+			case(i_cmd_state) 
 				CMD_IDLE: begin
-				
+					r_t_HD_STA_counter		<=		0;
+					r_t_VD_DAT_counter		<=		0;
 				end
 				
+				CMD_START: begin
+					if(w_t_HD_STA_done)
+						r_t_HD_STA_counter	<=		0;
+					else
+						r_t_HD_STA_counter	<=		r_t_HD_STA_counter + 1'b1;
+				end
 				
-			end
+				CMD_DATA_TRANSFER: begin
+					r_counter_for_SCL_en		<=		1'b0;	
+				end
+				
+				CMD_RESTART: begin
+				
+				end
+
+				CMD_STOP: begin
+				
+				end				
+			endcase
 		end
 	end
+	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////		
+	
 endmodule
