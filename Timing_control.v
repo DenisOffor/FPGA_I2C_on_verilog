@@ -27,9 +27,9 @@ module Timing_control #(parameter CMD_IDLE = 4'b0000, CMD_START = 4'b0001, CMD_D
 	reg	[6:0]		r_counter_for_SCL			=	0;
 	reg				r_counter_for_SCL_en		= 	1'b1;
 	reg				r_SCL							=	1'b0;
-	wire	[6:0]		w_t_LOW_count_goal		=	(r_mode == 0) ? 7'd24 : 7'd7;	//standart or fast mode (5000 or 1400 ns)
+	wire	[6:0]		w_t_LOW_count_goal		=	(r_mode == 0) ? 7'd25 : 7'd7;	//standart or fast mode (5000 or 1400 ns)
 	wire 				w_t_LOW_done				= 	(r_counter_for_SCL == w_t_LOW_count_goal);	
-	wire	[6:0]		w_t_HIGH_count_goal		=	(r_mode == 0) ? (7'd25 + w_t_LOW_count_goal) : (7'd6 + w_t_LOW_count_goal);	//standart or fast mode (5000 or 1200 ns)
+	wire	[6:0]		w_t_HIGH_count_goal		=	(r_mode == 0) ? (7'd24 + w_t_LOW_count_goal) : (7'd5 + w_t_LOW_count_goal);	//standart or fast mode (5000 or 1200 ns)
 	wire 				w_t_HIGH_done				= 	(r_counter_for_SCL == w_t_HIGH_count_goal);
 	assign			o_SCL							=	r_SCL;
 	////////////////////////////////////////////////////
@@ -39,7 +39,7 @@ module Timing_control #(parameter CMD_IDLE = 4'b0000, CMD_START = 4'b0001, CMD_D
 	////////////////////////////////////////////////////
 	//Timer for t_HD_STA timing/////////////////////////	
 	reg	[5:0]		r_t_HD_STA_counter		=	0;
-	wire	[5:0]		w_t_HD_count_goal			=	(r_mode == 0) ? 7'd21 : 7'd4;	//standart or fast mode (4200 or 800 ns)
+	wire	[5:0]		w_t_HD_count_goal			=	(r_mode == 0) ? 7'd20 : 7'd3;	//standart or fast mode (4200 or 800 ns)
 	wire 				w_t_HD_STA_done			= 	(r_t_HD_STA_counter == w_t_HD_count_goal);
 	assign 			o_t_HD_STA_done			=	w_t_HD_STA_done;
 	////////////////////////////////////////////////////
@@ -117,7 +117,6 @@ module Timing_control #(parameter CMD_IDLE = 4'b0000, CMD_START = 4'b0001, CMD_D
 				r_counter_for_SCL 	<= r_counter_for_SCL + 1'b1;
 			end
 			else if(w_t_HIGH_done) begin
-				r_SCL					<=	1'b0;	
 				r_counter_for_SCL <= 0;
 			end
 			else 
@@ -141,8 +140,10 @@ module Timing_control #(parameter CMD_IDLE = 4'b0000, CMD_START = 4'b0001, CMD_D
 				end
 				
 				CMD_START: begin
-					if(w_t_HD_STA_done)
+					if(w_t_HD_STA_done) begin
 						r_t_HD_STA_counter	<=		0;
+						r_counter_for_SCL_en	<=		1'b0;	
+					end
 					else
 						r_t_HD_STA_counter	<=		r_t_HD_STA_counter + 1'b1;
 				end

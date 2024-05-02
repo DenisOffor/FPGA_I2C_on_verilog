@@ -4,13 +4,14 @@ module IIC_module
 	input 				i_rst,
 	input 				i_start,
 	input					i_RW,
-	input		[7:0]		i_W_memory,
+	input		[7:0]		i_W_byte,
 	input					i_mode,
+	input		[6:0]		i_address,
 	
 	inout					o_SDA,
 	inout 				o_SCL,
 	
-	output	[7:0]		o_R_memory,
+	output	[7:0]		o_R_byte,
 	output				o_LED1,
 	output				o_LED2,	
 	output				o_LED3,	
@@ -35,7 +36,7 @@ module IIC_module
 	////////////////////////////////////////////////////	
 	reg 				r_SDA						= 	1'bz;
 	assign			o_SDA						= 	r_SDA;
-	reg	[7:0]		r_R_memory				=	0;
+	reg	[7:0]		r_R_byte					=	0;
 	////////////////////////////////////////////////////
 	////////////////////////////////////////////////////
 	/**/
@@ -66,7 +67,14 @@ module IIC_module
 	////////////////////////////////////////////////////
 	////////////////////////////////////////////////////
 	/**/
-	/**/	
+	/**/
+	wire	[7:0]		w_first_byte			=	i_address | (i_RW << 7);	
+
+	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////
+	/**/
+	/**/
+		
 	
 	//debug
 	wire 	[7:0]		w_test_data				=	8'b00101110;
@@ -76,7 +84,7 @@ module IIC_module
 		if(i_rst) begin
 			r_CMD_state					<= CMD_IDLE;
 			r_SDA							<=	1'bz;
-			r_R_memory					<= 0;
+			r_R_byte						<= 0;
 		end
 		else begin
 			case(r_CMD_state)
@@ -87,8 +95,10 @@ module IIC_module
 							r_CMD_state <=	CMD_START;		
 							r_LED1		<= 1'b1;
 						//end	
-						//else
+						//else begin
 						//	r_LED1		<= 1'b0;
+						//	r_CMD_state <=	CMD_IDLE;	
+						//end
 					end
 				end
 			
@@ -101,7 +111,7 @@ module IIC_module
 				
 				CMD_DATA_TRANSFER: begin
 					if(w_t_HD_DAT_done) begin
-						r_SDA				<=	w_test_data[r_iter];
+						r_SDA				<=	w_first_byte[r_iter];
 						r_iter			<=	r_iter + 1'b1;	
 					end
 				end
