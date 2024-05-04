@@ -1,4 +1,4 @@
-module Timing_control #(parameter CMD_IDLE = 4'b0000, CMD_START = 4'b0001, CMD_DATA_TRANSFER	= 4'b0010, CMD_RESTART = 4'b0011, CMD_STOP = 4'b0100)
+module Timing_control #(parameter CMD_IDLE = 4'b0000, CMD_START = 4'b0001, CMD_DATA_TRANSFER	= 4'b0010, CMD_CATCH_ACK = 4'b0011 ,CMD_RESTART = 4'b0100, CMD_STOP = 4'b0101)
 (
 	input			i_clk,
 	input			i_rst,
@@ -6,9 +6,11 @@ module Timing_control #(parameter CMD_IDLE = 4'b0000, CMD_START = 4'b0001, CMD_D
 	input	[4:0]	i_cmd_state,
 		
 	output		o_clk_10MHz,
-	inout			o_SCL,
+	inout			io_SCL,
 	output		o_t_HD_STA_done,
-	output		o_t_HD_DAT_done,
+	output		o_t_HD_DAT_done, 
+	output		o_t_Catch_ACK_done,
+	output		o_t_HIGH_done,
 	output		o_t_VD_DAT_done
 );
 
@@ -31,15 +33,23 @@ module Timing_control #(parameter CMD_IDLE = 4'b0000, CMD_START = 4'b0001, CMD_D
 	wire 				w_t_LOW_done				= 	(r_counter_for_SCL == w_t_LOW_count_goal);	
 	wire	[6:0]		w_t_HIGH_count_goal		=	(r_mode == 0) ? (7'd24 + w_t_LOW_count_goal) : (7'd5 + w_t_LOW_count_goal);	//standart or fast mode (5000 or 1200 ns)
 	wire 				w_t_HIGH_done				= 	(r_counter_for_SCL == w_t_HIGH_count_goal);
-	assign			o_SCL							=	r_SCL;
+	assign			o_t_HIGH_done				=	w_t_HIGH_done;
+	assign			io_SCL						=	r_SCL;
 	////////////////////////////////////////////////////
 	////////////////////////////////////////////////////	
 	
+	////////////////////////////////////////////////////
+	//for generate "Ready read" signal//////////////////		
+	wire	[6:0]		w_t_Catch_ACK_count_goal	=	(r_mode == 0) ? 7'd37 : 7'd10;	//center of SCL (7400 or 2000 ns)
+	wire 				w_t_Catch_ACK_done			= 	(r_counter_for_SCL == w_t_Catch_ACK_count_goal);	
+	assign			o_t_Catch_ACK_done			=	w_t_Catch_ACK_done;
+	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////	
 	
 	////////////////////////////////////////////////////
 	//Timer for t_HD_STA timing/////////////////////////	
 	reg	[5:0]		r_t_HD_STA_counter		=	0;
-	wire	[5:0]		w_t_HD_count_goal			=	(r_mode == 0) ? 7'd20 : 7'd3;	//standart or fast mode (4200 or 800 ns)
+	wire	[5:0]		w_t_HD_count_goal			=	(r_mode == 0) ? 6'd20 : 6'd3;	//standart or fast mode (4200 or 800 ns)
 	wire 				w_t_HD_STA_done			= 	(r_t_HD_STA_counter == w_t_HD_count_goal);
 	assign 			o_t_HD_STA_done			=	w_t_HD_STA_done;
 	////////////////////////////////////////////////////
@@ -48,12 +58,12 @@ module Timing_control #(parameter CMD_IDLE = 4'b0000, CMD_START = 4'b0001, CMD_D
 	
 	////////////////////////////////////////////////////
 	//Timer for t_HD_DAT timing/////////////////////////		
-	wire	[5:0]		w_t_HD_DAT_count_goal	=	(r_mode == 0) ? 7'd5 : 7'd2;	//standart or fast mode (1000 or 400 ns)
+	wire	[5:0]		w_t_HD_DAT_count_goal	=	(r_mode == 0) ? 6'd5 : 6'd2;	//standart or fast mode (1000 or 400 ns)
 	wire 				w_t_HD_DAT_done			= 	(r_counter_for_SCL == w_t_HD_DAT_count_goal);
 	assign 			o_t_HD_DAT_done			=	w_t_HD_DAT_done;
 	////////////////////////////////////////////////////
 	////////////////////////////////////////////////////	
-
+ 
 	
 	////////////////////////////////////////////////////
 	//Timer for t_VD_DAT timing/////////////////////////		
@@ -152,12 +162,16 @@ module Timing_control #(parameter CMD_IDLE = 4'b0000, CMD_START = 4'b0001, CMD_D
 					r_counter_for_SCL_en		<=		1'b0;	
 				end
 				
+				CMD_CATCH_ACK: begin
+					r_counter_for_SCL_en		<=		1'b0;
+				end
+				
 				CMD_RESTART: begin
 				
 				end
 
 				CMD_STOP: begin
-				
+					r_counter_for_SCL_en		<=		1'b1;
 				end				
 			endcase
 		end

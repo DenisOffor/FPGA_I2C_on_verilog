@@ -25,12 +25,13 @@ module IIC_module_tb
 		.i_rst(rst),
 		.i_start(start),
 		.i_RW(0),
-		.i_W_byte(),
+		.i_W_byte(8'b01001110),
+		.i_amount_of_bytes(1),
 		.i_mode(0),
 		.i_address(7'b1001111),
 		
-		.o_SDA(),
-		.o_SCL(),
+		.io_SDA(),
+		.io_SCL(),
 		
 		.o_R_byte(),
 		.o_LED1(),
@@ -38,5 +39,4 @@ module IIC_module_tb
 		.o_LED3(),	
 		.o_LED4()	
 	);
-
 endmodule
