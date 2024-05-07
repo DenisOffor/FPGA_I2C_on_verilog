@@ -4,14 +4,16 @@ module IIC_module
 	input 				i_rst,
 	input 				i_start,
 	input					i_RW,
+	input					i_mode,
+
 	input		[7:0]		i_W_byte,
 	input		[7:0]		i_amount_of_bytes,
-	input					i_mode,
 	input		[6:0]		i_address,
 	
 	inout					io_SDA,
 	inout 				io_SCL,
 	
+	output				o_Ready_set_new_byte,
 	output	[7:0]		o_R_byte,
 	output				o_LED1,
 	output				o_LED2,	
@@ -73,11 +75,19 @@ module IIC_module
 	/**/
 	/**/
 	////////////////////////////////////////////////////
+	//reg for writing ACK///////////////////////////////
+	reg				r_ACK						=	0;
+	////////////////////////////////////////////////////
+	////////////////////////////////////////////////////
+	/**/
+	/**/
+	////////////////////////////////////////////////////
 	//wires and regs for transfered bytes///////////////
-	reg	[7:0]		r_amount_of_bytes		=	0;
-	reg	[7:0]		r_first_byte			=	0;	
+	reg	[7:0]		r_amount_of_bytes		=	0;	
 	reg	[7:0]		r_current_byte			=	0;
 	reg	[3:0]		r_iter					=	0;
+	reg				r_Ready_set_new_byte	=	0;
+	assign			o_Ready_set_new_byte = 	r_Ready_set_new_byte;
 	////////////////////////////////////////////////////
 	////////////////////////////////////////////////////
 	/**/
@@ -89,6 +99,9 @@ module IIC_module
 			r_SDA							<=	1'bz;
 			r_R_byte						<= 0;
 			r_iter						<=	0;
+			r_ACK							<=	0;
+			r_current_byte				<=	0;
+			r_Ready_set_new_byte		<=	0;
 		end
 		else begin
 			case(r_CMD_state)
@@ -98,7 +111,7 @@ module IIC_module
 						//if(io_SDA == 1'bz && io_SCL == 1'bz) begin//1 1
 							r_CMD_state				<=	CMD_START;
 							r_amount_of_bytes		<=	i_amount_of_bytes;	
-							r_first_byte			<=	i_address | (i_RW << 7);	
+							r_current_byte			<=	i_address | (i_RW << 7);
 							r_LED1					<= 1'b1;
 						//end	
 						//else begin
@@ -117,7 +130,7 @@ module IIC_module
 				
 				CMD_DATA_TRANSFER: begin
 					if(w_t_HD_DAT_done) begin
-						r_SDA			<=	r_first_byte[r_iter];
+						r_SDA			<=	r_current_byte[r_iter];
 						r_iter		<=	r_iter + 1'b1;	
 					end
 					//if 8 bit transfered and SCL go from High to Low -> need to catch ACK bit
@@ -128,12 +141,20 @@ module IIC_module
 				end
 				
 				CMD_CATCH_ACK: begin
-					r_SDA					<=	1'b1; //z
+					if(w_t_HD_DAT_done) begin
+						r_SDA							<=	1'b1; //z
+					end
 					if(w_t_Catch_ACK_done) begin
-						//don't forget to change if and else 
+						r_ACK							<= io_SDA;
+						r_Ready_set_new_byte 	<= 1'b1;
+					end 
+					if(w_t_HIGH_done) begin
 						if(io_SDA) begin
+							r_ACK						<=	0;
+							r_Ready_set_new_byte <=	1'b0;
 							if(r_amount_of_bytes) begin
 								r_CMD_state 		<=	CMD_DATA_TRANSFER;
+								r_current_byte		<=	i_W_byte;
 								r_amount_of_bytes	<= r_amount_of_bytes - 1'b1;
 							end
 							else begin
@@ -141,7 +162,7 @@ module IIC_module
 							end
 						end
 						else begin
-							r_CMD_state <=	CMD_STOP;
+							r_CMD_state 			<=	CMD_STOP;
 						end
 					end
 				end
@@ -151,7 +172,12 @@ module IIC_module
 				end
 				
 				CMD_STOP: begin
-					r_SDA					<=	1'bz;
+					if(w_t_HD_DAT_done) begin
+						r_SDA					<=	1'b0;
+					end
+					else if(w_t_HIGH_done) begin
+						r_SDA					<=	1'b1; //z
+					end
 				end
 				
 			endcase

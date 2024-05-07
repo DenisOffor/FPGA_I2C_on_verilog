@@ -171,7 +171,9 @@ module Timing_control #(parameter CMD_IDLE = 4'b0000, CMD_START = 4'b0001, CMD_D
 				end
 
 				CMD_STOP: begin
-					r_counter_for_SCL_en		<=		1'b1;
+					if(w_t_HIGH_done) begin
+						r_counter_for_SCL_en	<=		1'b1;
+					end
 				end				
 			endcase
 		end
